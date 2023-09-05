@@ -9,10 +9,10 @@ jamfpassword="password"
 currentDate=$(date "+%Y-%m-%d")
 
 # Define the CSV file name with the desired format
-csvFileName="TAMU - NonCategorized Configuration Profiles - $currentDate.csv"
+csvFileName="filename - $currentDate.csv"
 
 # Define the path where the CSV file will be saved
-csvFilePath="/Users/shem/Library/CloudStorage/OneDrive-TexasA&MUniversity/Desktop/Jamf Output/$csvFileName"
+csvFilePath="path/$csvFileName"
 
 # Function to retrieve data from the Jamf Pro server
 get_data() {
