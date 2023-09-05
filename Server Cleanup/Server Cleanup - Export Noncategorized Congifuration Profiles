@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Jamf Pro server URL and API credentials
+jamfProURL="https://server.jamfcloud.com"
+jamfusername="username"
+jamfpassword="password"
+
+# Get the current date in the format YYYY-MM-DD
+currentDate=$(date "+%Y-%m-%d")
+
+# Define the CSV file name with the desired format
+csvFileName="TAMU - NonCategorized Configuration Profiles - $currentDate.csv"
+
+# Define the path where the CSV file will be saved
+csvFilePath="/Users/shem/Library/CloudStorage/OneDrive-TexasA&MUniversity/Desktop/Jamf Output/$csvFileName"
+
+# Function to retrieve data from the Jamf Pro server
+get_data() {
+    local endpoint="$1"
+    curl -s -u "$jamfusername:$jamfpassword" "$endpoint"
+}
+
+# Function to check if a configuration profile has the specified category structure
+has_no_category_assigned() {
+    local profile_data="$1"
+    if grep -q '<category><id>-1</id><name>No category assigned</name></category>' <<< "$profile_data"; then
+        echo "true"
+    else
+        echo "false"
+    fi
+}
+
+# Function to extract the name of a configuration profile
+extract_profile_name() {
+    local profile_data="$1"
+    xmlstarlet sel -t -v "//name" <<< "$profile_data"
+}
+
+# Retrieve configuration profiles
+profiles_data=$(get_data "$jamfProURL/JSSResource/osxconfigurationprofiles")
+
+# Check if the request was successful
+if [[ $? -eq 0 ]]; then
+    echo "Configuration Profile ID,Name,Category" > "$csvFilePath" # Header row in CSV
+
+    while read -r profile_id; do
+        profile_data=$(get_data "$jamfProURL/JSSResource/osxconfigurationprofiles/id/$profile_id")
+        if [[ $(has_no_category_assigned "$profile_data") == "true" ]]; then
+            profile_name=$(extract_profile_name "$profile_data")
+            echo "$profile_id,\"$profile_name\",No category assigned" >> "$csvFilePath"
+        fi
+    done <<< "$(xmlstarlet sel -t -m "//os_x_configuration_profile/id" -v . -n <<< "$profiles_data")"
+
+    echo "CSV file exported to: $csvFilePath"
+else
+    echo "Failed to retrieve data from the Jamf Pro server. Please check your credentials and server URL."
+fi
