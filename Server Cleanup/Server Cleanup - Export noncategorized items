@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Set the Jamf Pro API credentials and server URL
+jamfProURL="https://server.jamfcloud.com"
+jamfusername="username"
+jamfpassword="password"
+
+# Get the current date in the format YYYY-MM-DD
+currentDate=$(date "+%Y-%m-%d")
+
+# Define the CSV file name with the desired format
+csvFileName="name - $currentDate.csv"
+
+# Define the path where the CSV file will be saved
+csvFilePath="path/$csvFileName"
+
+# Use curl to make the API request with basic authentication and save the XML response to a temporary file
+tempXmlFile="/tmp/jamf_response.xml"
+/usr/bin/curl -X GET \
+  "$jamfProURL/JSSResource/policies/category/No%20category%20assigned" \
+  -H 'accept: application/xml' \
+  --user "$jamfusername:$jamfpassword" \
+  --output "$tempXmlFile"
+
+# Convert the XML to CSV using xmlstarlet
+xmlstarlet sel -T -t -m "/policies/policy" -v "id" -o "," -v "name" -n "$tempXmlFile" > "$csvFilePath"
+
+# Clean up the temporary XML file
+rm -f "$tempXmlFile"
