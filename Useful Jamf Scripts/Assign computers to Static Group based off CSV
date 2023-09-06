@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Prompt the user to enter Jamf API details
+jamfURL=$(osascript -e 'Tell application "System Events" to display dialog "Enter the Jamf URL:" default answer ""' -e 'text returned of result' 2>/dev/null)
+apiUser=$(osascript -e 'Tell application "System Events" to display dialog "Enter the API username:" default answer ""' -e 'text returned of result' 2>/dev/null)
+apiPass=$(osascript -e 'Tell application "System Events" to display dialog "Enter the API password:" default answer "" with hidden answer' -e 'text returned of result' 2>/dev/null)
+
+# Prompt the user to enter static group and CSV file details
+staticGroup=$(osascript -e 'Tell application "System Events" to display dialog "Enter the static group name:" default answer ""' -e 'text returned of result' 2>/dev/null)
+csvFile=$(osascript -e 'Tell application "System Events" to choose file with prompt "Select the CSV file:"' -e 'POSIX path of result' 2>/dev/null)
+
+# Extract serial numbers from the CSV file
+serialNumbers=($(awk -F ',' 'NR>1 {gsub(/[[:space:]]/, "", $1); print $1}' "$csvFile"))
+
+# Get the ID of the static group
+response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/computergroups" -X GET)
+groupID=$(xmllint --xpath "string(//computer_group[name='$staticGroup']/id)" - <<<"$response")
+
+if [[ -z $groupID ]]; then
+  echo "Failed to retrieve the ID of the static group: $staticGroup"
+  exit 1
+fi
+
+# Assign devices to static group
+for serialNumber in "${serialNumbers[@]}"
+do
+  # Remove special characters in serial number
+  escapedSerialNumber=$(sed 's/[&/\]/\\&/g' <<<"$serialNumber")
+
+  # Check if the device exists in Jamf
+  response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/computers/serialnumber/$escapedSerialNumber" -X GET)
+  deviceID=$(xmllint --xpath "string(/computer/general/id)" - <<<"$response")
+
+  if [[ -z $deviceID ]]; then
+    echo "Device with serial number $serialNumber does not exist in Jamf."
+    continue
+  fi
+
+  # Add the device to the static group
+  xmlData="<computer_group><computer_additions><computer><id>$deviceID</id></computer></computer_additions></computer_group>"
+  response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/computergroups/id/$groupID" -H "Content-Type: application/xml" -X PUT --data "$xmlData")
+
+  # Check if the device was assigned successfully
+  if [[ $(xmllint --xpath "string(/computer_group/id)" - <<<"$response" 2>/dev/null) ]]; then
+    echo "Device with serial number $serialNumber assigned to $staticGroup."
+  else
+    echo "Failed to assign device with serial number $serialNumber to $staticGroup."
+  fi
+
+done
