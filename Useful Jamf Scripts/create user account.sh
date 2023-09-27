@@ -8,9 +8,9 @@ generate_random_password() {
 }
 
 # Set the Jamf Pro API credentials and server URL
-jamfProURL="---"
-jamfusername="--"
-jamfpassword="-"
+jamfProURL="server"
+jamfusername="username"
+jamfpassword="password"
 
 # Request auth token
 authToken=$( /usr/bin/curl \
