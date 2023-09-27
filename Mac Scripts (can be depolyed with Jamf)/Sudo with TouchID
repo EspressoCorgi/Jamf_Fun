@@ -1,0 +1,65 @@
+# Get current user
+CURRENT_USER=$(stat -f %Su /dev/console)
+USER_ID=$(id -u "$CURRENT_USER")
+
+#############
+# FUNCTIONS #
+#############
+
+macos14above() {
+# Reading 3rd line
+CHECK_3RD_ROW=$(cat /private/etc/pam.d/sudo_local | sed -n 3p)
+
+# Checking if Sudo Touch ID is already configured
+if [ "$CHECK_3RD_ROW" = "auth       sufficient     pam_tid.so" ]; then
+ osascript -e 'tell application (path to frontmost application as text) to display dialog "Sudo Touch ID is already configured." buttons {"OK"} with icon note'
+else
+ # Create sudo_local from template
+ cp /private/etc/pam.d/sudo_local.template /private/etc/pam.d/sudo_local
+
+ # Backup sudo_local then remove '#' at line 3
+ sed -i '.bak' '3s/#//' "/private/etc/pam.d/sudo_local"
+ 
+ # Dialog
+ osascript -e 'tell application (path to frontmost application as text) to display dialog "Sudo Touch ID is now available.\nPlease quit and re-run your Terminal." buttons {"OK"} with icon note'
+fi
+}
+
+macos13below() {
+# Reading 2nd row
+CHECK_2ND_ROW=$(cat /private/etc/pam.d/sudo | sed -n 2p)
+
+# Checking if Sudo Touch ID is already configured
+if [ "$CHECK_2ND_ROW" = "auth       sufficient     pam_tid.so" ]; then
+ osascript -e 'tell application (path to frontmost application as text) to display dialog "Sudo Touch ID is already configured." buttons {"OK"} with icon note'
+else
+ # Backup sudo file then add 2nd row
+ sed -i '.bak' '2s/^/auth       sufficient     pam_tid.so\'$'\n/g' /private/etc/pam.d/sudo
+
+ # Dialog
+ osascript -e 'tell application (path to frontmost application as text) to display dialog "Sudo Touch ID is now available.\nPlease quit and re-run your Terminal." buttons {"OK"} with icon note'
+fi
+}
+
+#################
+# END FUNCTIONS #
+#################
+
+macos=$(sw_vers -productVersion | cut -d. -f1)
+echo "$macos"
+
+if [ "$macos" -ge "14" ]; then
+ echo "macOS is 14 or above"
+ macos14above
+elif [ "$macos" -lt "14" ]; then
+ echo "macOS is 13 or below"
+ macos13below
+fi
+
+# For iTerm2 compatibility only : Disable 'Allow sessions to survive logging out and back in'
+if [ -e "/Users/$CURRENT_USER/Library/Preferences/com.googlecode.iterm2.plist" ]; then
+ echo "Changing iTerm2 setting"
+ launchctl asuser "$USER_ID" sudo -u "$CURRENT_USER" defaults write com.googlecode.iterm2 BootstrapDaemon -bool false  
+fi
+
+exit 0
