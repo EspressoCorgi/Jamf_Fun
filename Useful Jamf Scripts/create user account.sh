@@ -1,14 +1,16 @@
 #!/bin/bash
 
+
+#### this does not work it is not an actual jamf function #####
 # Function to generate a random password
 generate_random_password() {
   tr -dc '[:alnum:]' < /dev/urandom | fold -w16 | head -n1
 }
 
 # Set the Jamf Pro API credentials and server URL
-jamfProURL="https://tamu.jamfcloud.com"
-jamfusername="shem-admin"
-jamfpassword="iCif8mFCrNi3Lx9rHGxd6?CeN"
+jamfProURL="---"
+jamfusername="--"
+jamfpassword="-"
 
 # Request auth token
 authToken=$( /usr/bin/curl \
