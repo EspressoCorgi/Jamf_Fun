@@ -1,26 +1,18 @@
 #!/bin/bash
 
 # Jamf Pro server URL
-jamfProURL="server"
+jamfProURL="your_server_url_here"
 
 # Jamf API credentials - Consider using environment variables for these
-jamfusername="username"
-jamfpassword="password"
-
-# Get the current date in the format YYYY-MM-DD
-currentDate=$(date "+%Y-%m-%d")
+jamfusername="your_username_here"
+jamfpassword="your_password_here"
 
 # Define the CSV file name with the desired format
+currentDate=$(date "+%Y-%m-%d")
 csvFileName="bad_policy_names_$currentDate.csv"
 
-# Define the path where the CSV file will be saved
-csvFilePath="/Path/$csvFileName"
-
-# Define the output directory
-OUTPUT_DIR="./exported_policies"
-
-# Create the output directory if it doesn't exist
-mkdir -p "$OUTPUT_DIR"
+# Define the output directory as a temporary directory
+OUTPUT_DIR=$(mktemp -d)
 
 # Function to export a policy
 export_policy() {
@@ -39,8 +31,17 @@ export_policy() {
     echo "$policy_name,$policy_id" >> "$csvFilePath"
 }
 
+# Trap the script exit to ensure cleanup
+cleanup_temp_directory() {
+    rm -rf "$OUTPUT_DIR"
+}
+trap cleanup_temp_directory EXIT
+
 # Get the list of all policies from Jamf Pro in XML format
 policies_xml=$(curl -s -u "$jamfusername:$jamfpassword" "$jamfProURL/JSSResource/policies")
+
+# Define the CSV file path
+csvFilePath="$OUTPUT_DIR/$csvFileName"
 
 # Write the CSV file header
 echo "Policy Name,Policy ID" > "$csvFilePath"
