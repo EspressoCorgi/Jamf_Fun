@@ -1,0 +1,8 @@
+#!/bin/bash
+
+if [ -e /usr/local/TS/receipts/macOSUpdateNotification.txt ]; then
+	MacOSNotification=$(cat /usr/local/TS/receipts/macOSUpdateNotification.txt)
+	echo "Notification Ran,Results=<result>$MacOSNotification</result>"
+else
+	echo "<result>Notification Results Unknown</result>"
+fi

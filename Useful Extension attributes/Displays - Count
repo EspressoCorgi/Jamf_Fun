@@ -1,0 +1,5 @@
+#!/bin/bash
+
+displayCount=$(system_profiler SPDisplaysDataType | grep -c Resolution)
+
+echo "<result>$displayCount</result>"

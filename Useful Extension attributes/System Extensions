@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sysExtInstalled=$(systemextensionsctl list)
+echo "<result>$sysExtInstalled</result>"

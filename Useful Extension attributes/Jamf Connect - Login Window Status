@@ -1,0 +1,19 @@
+#!/bin/bash
+
+
+loginwindow=$(/Library/Security/SecurityAgentPlugins/JamfConnectLogin.bundle/Contents/MacOS/authchanger -print)
+
+if echo "$loginwindow" | grep -q "JamfConnectLogin:LoginUI"
+then
+	status="Jamf Connect Login Window"
+elif echo "$loginwindow" | grep -q "JamfConnectLogin:DeMobilize,privileged"
+then
+	status="Jamf Connect Demobilization Process"
+elif echo "$loginwindow" | grep -q "NoMADLoginAD:CreateUser,privileged"
+then
+	status="NoMADLoginAD"
+else
+	status="macOS Login Window"
+fi
+
+echo "<result>$status</result>"

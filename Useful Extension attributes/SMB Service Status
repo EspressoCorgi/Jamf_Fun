@@ -1,0 +1,10 @@
+#!/bin/bash
+
+SMBStatus=$(launchctl list | grep com.apple.smbd)
+
+if [[ -n "$SMBStatus" ]]
+then
+	echo "<result>Running</result>"
+else
+	echo "<result>Stopped</result>"
+fi

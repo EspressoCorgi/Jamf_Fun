@@ -1,0 +1,8 @@
+#!/bin/sh
+
+epoch=$(/usr/bin/stat -s /var/db/SystemKey | grep -E -o "st_birthtime=.{0,11}" | tr -d "st_birthtime=")
+date=$(date -r $epoch "+%Y-%m-%d %H:%M:%S")
+
+echo "<result>$date</result>"
+
+exit 0

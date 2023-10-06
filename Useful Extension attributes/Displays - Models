@@ -1,0 +1,5 @@
+#!/bin/bash
+
+displayModel=$(system_profiler SPDisplaysDataType -xml | awk -F'>|<' '/>_name</{getline; print $3}' | grep -v "Intel\|AMD\|spdisplays\|M1\|M2")
+
+echo "<result>$displayModel</result>"

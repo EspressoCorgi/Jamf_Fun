@@ -1,0 +1,5 @@
+#!/bin/bash
+
+displayResolutions=$(system_profiler SPDisplaysDataType -xml | awk -F'>|<' '/_spdisplays_resolution/{getline; print $3}')
+
+echo "<result>$displayResolutions</result>"

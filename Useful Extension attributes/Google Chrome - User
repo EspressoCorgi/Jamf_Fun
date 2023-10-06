@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# check-chrome-users.sh
+#
+# Extension attribute to report which accounts
+# are logged into Google Chrome on a Mac.
+#
+# For use as a JAMF Casper Suite extension attribute
+#
+# Adam Codega, Swipely
+#
+
+loggedinuser=$( scutil <<< "show State:/Users/ConsoleUser" | awk '/Name :/ && ! /loginwindow/ { print $3 }' )
+
+cp "/Users/$loggedinuser/Library/Application Support/Google/Chrome/Local State" /private/tmp/chrome.json
+
+chmod 755 /private/tmp/chrome.json
+
+plutil -convert xml1 "/private/tmp/chrome.json"
+mv /private/tmp/chrome.json /private/tmp/chrome.plist
+username=$(/usr/libexec/PlistBuddy -c "Print :profile:info_cache:Default:user_name" /private/tmp/chrome.plist)
+
+echo "<result>$username</result>"

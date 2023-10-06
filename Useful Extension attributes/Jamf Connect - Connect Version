@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#Jamf Connect 2.0 Location
+ jamfConnectLocation="/Applications/Jamf Connect.app"
+if [ -e "$jamfConnectLocation" ]; then
+
+ jamfConnectVersion=$(defaults read "$jamfConnectLocation"/Contents/Info.plist "CFBundleShortVersionString" || echo "Does not exist")
+echo "jamfConnectVersion"
+echo "<result>$jamfConnectVersion</result>"
+else
+	echo "<result>Not Installed</result>"
+fi

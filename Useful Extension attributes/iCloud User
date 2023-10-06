@@ -1,0 +1,16 @@
+#!/bin/sh
+
+
+
+lastUser=`defaults read /Library/Preferences/com.apple.loginwindow lastUserName`
+
+
+if [[ -e /Users/$lastUser/Library/Preferences/MobileMeAccounts.plist ]]; then
+
+email=$(/usr/libexec/PlistBuddy -c "print Accounts:0:AccountID" /Users/$lastUser/Library/Preferences/MobileMeAccounts.plist)
+
+else
+email="No iCloud User"
+fi
+
+echo "<result>$email</result>"

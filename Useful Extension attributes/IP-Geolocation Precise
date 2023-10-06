@@ -1,0 +1,96 @@
+#!/bin/bash
+
+if [[ -d /private/tmp/geolocation ]]; then
+	rm -rf /private/tmp/geolocation
+	mkdir -p /private/tmp/geolocation
+else
+	sleep 1
+	mkdir -p /private/tmp/geolocation
+fi
+
+# Get a list of access points and their signal strength
+#aps=$(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -s )
+
+aps=$(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -s | cut -c 34- | grep -v RSSI | awk '{print $1 " " $2}')
+
+# Sort the list by signal strength (second field) in descending order
+sorted=$(echo "$aps" | sort -nurk2 )
+# Get the BSSID of the top 3 access points with the strongest signal
+#top_6=$(echo "$sorted_aps" | awk 'NR<=6 {print $3, $4}')
+
+# Print the BSSIDs
+echo "$sorted" > /private/tmp/geolocation/location.txt
+# Set the file to read from as the first command line argument
+file="/private/tmp/geolocation/location.txt"
+
+# Initialize the line count to 0
+line_count=0
+
+(
+	cat <<KRB5CONF
+{
+	"considerIp": "false",
+	"wifiAccessPoints": [
+KRB5CONF
+) > "/private/tmp/geolocation/json.json"
+# Read each line of the file
+while read bssid strength; do
+	# Increment the line count for each line read
+	((line_count++))
+	# Output the line with the desired string
+	
+	(
+		cat <<KRB5CONF
+		{
+			"macAddress": "$bssid",
+			"signalStrength": ${strength},
+			"signalToNoiseRatio": 0
+		},
+KRB5CONF
+	) >> "/private/tmp/geolocation/json.json"
+	
+done < "$file"
+
+# Store the file contents in a variable
+contents=$(<"/private/tmp/geolocation/json.json")
+
+# Remove the very last comma in the file
+contents=${contents%,}
+
+# Write the modified contents back to the file
+echo "$contents" > "/private/tmp/geolocation/json.json"
+
+(
+	cat <<KRB5CONF
+	]
+}
+KRB5CONF
+) >> "/private/tmp/geolocation/json.json"
+
+# Output the line count
+#echo "There are $line_count lines in the file."
+
+
+cd /private/tmp/geolocation/
+curl -d @json.json -H "Content-Type: application/json" -i "https://www.googleapis.com/geolocation/v1/geolocate?key=AIzaSyAhi3lg0tUNfrwNrCeZU87qkuGM3aNc_U0" -o /private/tmp/geolocation/coordinate.json
+
+sudo chmod 755 /private/tmp/geolocation/coordinate.json
+latitude=$(grep "lat" /private/tmp/geolocation/coordinate.json | awk 'BEGIN { FS=" " } NR==1{print $2}' | sed 's/,/\
+/g')
+
+longitude=$(grep "lng" /private/tmp/geolocation/coordinate.json | awk 'BEGIN { FS=" " } NR==1{print $2}' | sed 's/,/\
+/g')
+
+accuracy=$(grep "accuracy" /private/tmp/geolocation/coordinate.json | awk 'BEGIN { FS=" " } NR==1{print $2}' | sed 's/,/\
+/g')
+accuracyinfeet=$(echo "$accuracy * 3" | bc -l)
+
+
+if [[ ${#latitude} -lt 4 ]] ; then
+	# An expected result
+	NumberOfAPs=$(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -s | grep -v RSSI | wc -l)
+	echo "<result>Location could not be determined, $NumberOfAPs APs</result>"
+else
+	# Latitude contains more than 4 characters
+	echo "<result>$latitude, $longitude - Accuracy: $accuracyinfeet"ft" - APs: $line_count</result>"
+fi

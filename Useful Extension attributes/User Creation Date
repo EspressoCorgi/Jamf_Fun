@@ -1,0 +1,14 @@
+#!/bin/bash
+
+mkdir -p /private/tmp/userdata/
+# Get all user accounts on the system
+allUsers=$(dscl . -list /Users | grep -v "^_" | awk '{if ($1 != "root" && $1 != "nobody") print $1}' | grep -v "daemon")
+echo "<result>"
+# Loop through each user and get the date they were created
+for user in $allUsers; do
+    dscl . -read /Users/$user > /private/tmp/userdata/"$user".txt
+    creationTime=$(grep -A 1 -m 1 "creationTime" /private/tmp/userdata/"$user".txt | tail -n 1 | sed 's/<real>//;s/<\/real>//')
+    dateTime=$(date -r "${creationTime%.*}" +"%Y-%m-%d %H:%M:%S")
+    echo "$user: $dateTime"
+done
+echo "</result>"

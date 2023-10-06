@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ClamshellState=$(ioreg -r -k AppleClamshellState -d 4 | grep AppleClamshellState | awk 'BEGIN { FS="=" } { print $2 }' | sed 's/ //g')
+
+
+echo "<result>$ClamshellState</result>"

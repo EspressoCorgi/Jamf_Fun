@@ -1,0 +1,15 @@
+#!/bin/sh
+
+### Returns the number of mobile accounts on a Mac
+
+NETACCLIST=$(dscl . list /Users OriginalNodeName | awk '{print $1}' 2>/dev/null)
+count=$(echo $NETACCLIST | wc -w)
+
+
+if [ "$NETACCLIST" == "" ]; then
+echo "<result>0</result>"
+else
+echo "<result>$count</result>"
+fi
+
+exit 0
