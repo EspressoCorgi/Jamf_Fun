@@ -1,0 +1,3 @@
+#run via files and processes within polices
+
+/usr/local/bin/authchanger -reset

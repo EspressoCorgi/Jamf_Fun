@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Check the current computer name
+current_computer_name=$(scutil --get ComputerName)
+
+# Specify the target computer name to match
+#target_computer_name=("MacBook Pro" "MacBook Air" "iMac")
+
+# Check if the current computer name matches the target
+#if [ "$current_computer_name" = "$target_computer_name" ]; then
+    # Get the serial number
+    serial_number=$(system_profiler SPHardwareDataType | awk '/Serial Number/ { print $NF }')
+
+    # Set the new computer name using the serial number
+    new_computer_name="$serial_number"
+
+    # Set the new local hostname
+    new_local_hostname="$serial_number"
+
+    # Set the new network hostname
+    new_network_hostname="$serial_number"
+
+    # Set the computer name
+    sudo scutil --set ComputerName "$new_computer_name"
+
+    # Set the local hostname
+    sudo scutil --set LocalHostName "$new_local_hostname"
+
+    # Set the network hostname
+    sudo scutil --set HostName "$new_network_hostname"
+
+    echo "Computer renamed to: $new_computer_name"
+
+exit 0

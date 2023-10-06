@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Get the logged in users username
+loggedInUser=`/bin/ls -l /dev/console | /usr/bin/awk '{ print $3 }'`
+
+# Get NetworkUser from dscl
+netID="$(dscl . -read /Users/$loggedInUser | grep "NetworkUser" | cut -d " " -f 2)"
+
+# Run recon, submitting the users username which as of 8.61+ can then perform an LDAP lookup
+sudo jamf recon -endUsername $netID
+
+echo "Finished running recon for $netID `date`..."

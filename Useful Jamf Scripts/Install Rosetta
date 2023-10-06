@@ -1,0 +1,4 @@
+#run via files and processes within polices
+
+/usr/sbin/softwareupdate --install-rosetta --agree-to-license
+

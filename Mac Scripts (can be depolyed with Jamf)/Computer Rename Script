@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Request sudo password upfront
+sudo -v
+
+# Function to prompt the user for a new computer name
+get_computer_name() {
+    computer_name=$(osascript -e 'Tell application "System Events" to display dialog "Enter a new computer name:" default answer ""' -e 'text returned of result' 2>/dev/null)
+
+    # Trim leading and trailing whitespace
+    computer_name=$(echo "$computer_name" | xargs)
+
+    # Check if the computer name is empty
+    if [[ -z "$computer_name" ]]; then
+        osascript -e 'Tell application "System Events" to display alert "Computer name cannot be blank."'
+        get_computer_name
+    fi
+}
+
+# Prompt the user for a new computer name
+get_computer_name
+
+# Rename the computer
+sudo scutil --set ComputerName "$computer_name"
+sudo scutil --set HostName "$computer_name"
+sudo scutil --set LocalHostName "$computer_name"
+sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "$computer_name"
+
+# Display the updated computer name
+osascript -e 'Tell application "System Events" to display dialog "Computer name changed to: '"$computer_name"'"'
+

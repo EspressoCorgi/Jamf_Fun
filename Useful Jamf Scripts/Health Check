@@ -1,0 +1,23 @@
+#!/bin/bash
+
+echo "Running Recon"
+sudo jamf recon
+echo "Recon Complete, Checking for Policies next"
+
+sleep 3
+
+echo "Running Policy Check"
+sudo jamf policy
+echo "Policy Check Complete, Checking in with Protect next"
+
+sleep 3
+
+echo "Running Protect Check-In"
+sudo protectctl checkin
+echo "Protect Check-In Complete, Final Recon next"
+
+sleep 3
+
+echo "Running Final Recon"
+sudo jamf recon
+echo "Final Recon Complete, exiting Health Check"
