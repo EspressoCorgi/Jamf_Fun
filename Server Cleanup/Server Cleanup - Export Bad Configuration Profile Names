@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# Get the current logged-in user's home directory
+user_home_dir=$(eval echo "~$(whoami)")
+
+# Jamf Pro server URL
+jamfProURL="https://server.jamfcloud.com"
+
+# Jamf API credentials - Consider using environment variables for these
+jamfusername="username"
+jamfpassword="password"
+
+# Define the CSV file name with the desired format
+currentDate=$(date "+%Y-%m-%d")
+csvFileName="bad_profile_names_$currentDate.csv"
+
+# Define the output directory as a temporary directory
+OUTPUT_DIR=$(mktemp -d)
+
+# Function to sanitize profile names
+sanitize_profile_name() {
+    local profile_name="$1"
+    # Remove HTML tags and special characters from the profile name
+    sanitized_name=$(echo "$profile_name" | sed 's/<[^>]*>//g' | tr -d '[:punct:]')
+    echo "$sanitized_name"
+}
+
+# Function to export a profile
+export_profile() {
+    local profile_id="$1"
+    local profile_name="$2"
+
+    # Sanitize the profile name
+    sanitized_profile_name=$(sanitize_profile_name "$profile_name")
+
+    # Export the profile to a temporary XML file
+    local temp_xml=$(mktemp)
+    if curl -o "$temp_xml" -u "$jamfusername:$jamfpassword" "$jamfProURL/JSSResource/profiles/id/$profile_id" >/dev/null 2>&1; then
+        echo "Exported profile: $sanitized_profile_name (ID: $profile_id)"
+        # Append sanitized profile name, ID to the CSV file in the user's "Downloads" folder
+        echo "$sanitized_profile_name,$profile_id" >> "$user_home_dir/Downloads/$csvFileName"
+    else
+        echo "Failed to export profile: $sanitized_profile_name (ID: $profile_id)"
+    fi
+
+    # Remove the temporary XML file
+    rm -f "$temp_xml"
+}
+
+# Trap the script exit to ensure cleanup
+cleanup_temp_directory() {
+    rm -rf "$OUTPUT_DIR"
+}
+trap cleanup_temp_directory EXIT
+
+# Get the list of all profiles from Jamf Pro in XML format
+profiles_xml=$(curl -s -u "$jamfusername:$jamfpassword" "$jamfProURL/JSSResource/profiles")
+
+# Write the CSV file header in the user's "Downloads" folder
+echo "Profile Name,Profile ID" > "$user_home_dir/Downloads/$csvFileName"
+
+# Define the abbreviations to filter profiles
+abbreviations=("Global" "AS" "ATH" "CD" "CAS" "ENG" "TAMUG" "TAMUH" "ITR" "ITSAP" "LCR" "RL" "PVFA" "SVM" "TS")
+
+# Initialize a counter for exported profiles
+exportedProfileCount=0
+
+# Loop through each profile and check if it meets the criteria
+while IFS= read -r line; do
+    # Separate the profile ID and name
+    profile_id=$(echo "$line" | cut -f1)
+    profile_name=$(echo "$line" | cut -f2-)
+
+    # Remove leading and trailing spaces from profile name
+    profile_name=$(echo "$profile_name" | xargs)
+
+    # Check if the profile name contains any of the abbreviations
+    matched=false
+    for abbreviation in "${abbreviations[@]}"; do
+        if [[ "$profile_name" == *"$abbreviation"* ]]; then
+            matched=true
+            break
+        fi
+    done
+
+    # Export the profile if it doesn't match any abbreviation
+    if [ "$matched" = false ]; then
+        export_profile "$profile_id" "$profile_name"
+        ((exportedProfileCount++))
+    fi
+done < <(echo "$profiles_xml" | xmlstarlet sel -t -m "//profile" -v "id" -o $'\t' -v "name" -n)
+
+# Update the CSV file in the user's "Downloads" folder with the total number of exported profiles
+echo "Total Profiles,$exportedProfileCount" >> "$user_home_dir/Downloads/$csvFileName"
+
+echo "Exported profiles that do not meet the criteria to $user_home_dir/Downloads/$csvFileName"

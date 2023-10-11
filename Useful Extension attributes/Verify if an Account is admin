@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Define the username to check
+username="lapsadmin"
+
+# Check if the username exists on the computer
+if dscl . -read /Users/"$username" 2>/dev/null; then
+    # Check if the username is a member of the admin group
+    if [[ $(dseditgroup -o checkmember -m "$username" admin) == "yes" ]]; then
+        result="administrator"
+    else
+        result="nonadministrator"
+    fi
+else
+    result="No lapsadmin"
+fi
+
+# Output the result
+echo "<result>$result</result>"
