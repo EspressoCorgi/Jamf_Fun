@@ -1,59 +1,51 @@
 #!/bin/bash
 
-# Jamf Pro server URL
-jamfProURL=""
+### This is very much a work in progress ###
 
-# Jamf API credentials - Consider using environment variables for these
-jamfusername=""
-jamfpassword=""
+# Set your Jamf Pro server URL and credentials
+JAMF_SERVER="https://server.jamfcloud.com"
+API_USER="user"
+API_PASSWORD="password"
 
-# Function to update the name of a policy in Jamf Pro
-update_policy_name() {
-    local policy_id="$1"
-    local new_policy_name="$2"
+# Arrays to store site names and their corresponding abbreviations
+site_names=("Academic Support" "Athletics" "Cellular Devices" "College of Arts & Sciences" "College of Engineering" "Galveston" "Health" "IT Research" "IT Strategic Alliances & Partnerships" "Labs & Conference Rooms" "Residence Life" "School of Performance, Visualization & Fine Arts" "School of Veterinary Medicine" "Technology Services")
+site_abbreviations=("AS - " "ATH - " "CD - " "CAS - " "ENG - " "TAMUG - " "TAMUH - " "ITR - " "ITSAP - " "LCR - " "RL - " "PVFA - " "SVM - " "TS - ")
 
-    # Update the policy name using the Jamf Pro API with PUT
-    if curl -X PUT -H "Content-Type: application/xml" -u "$jamfusername:$jamfpassword" \
-        -d "<?xml version='1.0' encoding='utf-8'?><policy><name>$new_policy_name</name></policy>" \
-        "$jamfProURL/JSSResource/policies/id/$policy_id" >/dev/null 2>&1; then
-        echo "Updated policy name (ID: $policy_id) to: $new_policy_name"
-    else
-        echo "Failed to update policy name (ID: $policy_id) to: $new_policy_name"
-    fi
+# Function to get a list of all policies from Jamf Pro
+get_all_policies() {
+  curl -s -u "$API_USER:$API_PASSWORD" "$JAMF_SERVER/JSSResource/policies"
 }
 
-# Get the list of all policies from Jamf Pro
-policies_xml=$(curl -s -u "$jamfusername:$jamfpassword" "$jamfProURL/JSSResource/policies")
+# Function to update the name of a policy
+update_policy_name() {
+  policy_id="$1"
+  new_name="$2"
+  curl -s -u "$API_USER:$API_PASSWORD" -X PUT -H "Content-Type: text/xml" -d "<policy><name>$new_name</name></policy>" "$JAMF_SERVER/JSSResource/policies/id/$policy_id"
+}
 
-# Extract policy information and update the name based on the site abbreviations
-while read -r policy_id policy_name; do
-    # Check if the policy name already contains a valid abbreviation
-    if [[ "$policy_name" =~ ^[A-Z]+\ - ]]; then
-        echo "Policy name (ID: $policy_id) already has a valid abbreviation: $policy_name"
-    else
-        # Determine the abbreviation based on the site name (customize as needed)
-        case "$policy_name" in
-            *"Academic Support") abbreviation="AS";;
-            *"Athletics") abbreviation="ATH";;
-            *"Cellular Devices") abbreviation="CD";;
-            *"College of Arts & Sciences") abbreviation="CAS";;
-            *"College of Engineering") abbreviation="ENG";;
-            *"Galveston") abbreviation="TAMUG";;
-            *"Health") abbreviation="TAMUH";;
-            *"IT Research") abbreviation="ITR";;
-            *"IT Strategic Alliances & Partnerships") abbreviation="ITSAP";;
-            *"Labs & Conference Rooms") abbreviation="LCR";;
-            *"Residence Life") abbreviation="RL";;
-            *"School of Performance, Visualization & Fine Arts") abbreviation="PVFA";;
-            *"School of Veterinary Medicine") abbreviation="SVM";;
-            *"Technology Services") abbreviation="TS";;
-            *) abbreviation="Global";; # Default to "Global" if not found in the mapping
-        esac
+# Get all policies from Jamf Pro
+policies=$(get_all_policies)
 
-        # Update the policy name in Jamf Pro with the abbreviation
-        new_policy_name="$abbreviation - $policy_name"
-        update_policy_name "$policy_id" "$new_policy_name"
+# Iterate through the policies and update their names
+for policy in $policies; do
+  current_name=$(echo "$policy" | sed -n -e 's/^.*<name>\(.*\)<\/name>.*$/\1/p')
+  new_name=""
+
+  # Check if the policy name contains a site name, and if so, add the abbreviation
+  for ((i=0; i<${#site_names[@]}; i++)); do
+    site="${site_names[$i]}"
+    abbreviation="${site_abbreviations[$i]}"
+    if [[ $current_name == *"$site"* ]]; then
+      new_name="${abbreviation} - $current_name"
+      break
     fi
-done < <(echo "$policies_xml" | xmlstarlet sel -t -m "//policy" -v "id" -o $'\t' -v "name" -n)
+  done
 
-echo "Updated policy names in Jamf Pro"
+  # If no site name was found in the policy name, mark it as "Global"
+  if [[ -z "$new_name" ]]; then
+    new_name="Global - $current_name"
+  fi
+
+  # Update the policy name with the new name
+  update_policy_name "$(echo "$policy" | sed -n -e 's/^.*<id>\(.*\)<\/id>.*$/\1/p')" "$new_name"
+done
