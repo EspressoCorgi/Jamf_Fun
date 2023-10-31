@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Prompt the user to enter Jamf API details
+jamfURL=$(osascript -e 'Tell application "System Events" to display dialog "Enter the Jamf URL:" default answer ""' -e 'text returned of result' 2>/dev/null)
+apiUser=$(osascript -e 'Tell application "System Events" to display dialog "Enter the API username:" default answer ""' -e 'text returned of result' 2>/dev/null)
+apiPass=$(osascript -e 'Tell application "System Events" to display dialog "Enter the API password:" default answer "" with hidden answer' -e 'text returned of result' 2>/dev/null)
+
+# Prompt the user to enter mobile device group and CSV file details
+mobileGroup=$(osascript -e 'Tell application "System Events" to display dialog "Enter the mobile device group name:" default answer ""' -e 'text returned of result' 2>/dev/null)
+csvFile=$(osascript -e 'Tell application "System Events" to choose file with prompt "Select the CSV file:"' -e 'POSIX path of result' 2>/dev/null)
+
+# Extract serial numbers from the CSV file
+serialNumbers=($(awk -F ',' 'NR>1 {gsub(/[[:space:]]/, "", $1); print $1}' "$csvFile"))
+
+# Get the ID of the mobile device group
+response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/mobiledevicegroups" -X GET)
+groupID=$(xmllint --xpath "string(//mobile_device_group[name='$mobileGroup']/id)" - <<<"$response")
+
+if [[ -z $groupID ]]; then
+  echo "Failed to retrieve the ID of the mobile device group: $mobileGroup"
+  exit 1
+fi
+
+# Assign devices to the mobile device group
+for serialNumber in "${serialNumbers[@]}"
+do
+  # Remove special characters in serial number
+  escapedSerialNumber=$(sed 's/[&/\]/\\&/g' <<<"$serialNumber")
+
+  # Check if the mobile device exists in Jamf
+  response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/mobiledevices/serialnumber/$escapedSerialNumber" -X GET)
+  deviceID=$(xmllint --xpath "string(/mobile_device/general/id)" - <<<"$response")
+
+  if [[ -z $deviceID ]]; then
+    echo "Mobile device with serial number $serialNumber does not exist in Jamf."
+    continue
+  fi
+
+  # Fetch the current list of devices in the group
+  response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/mobiledevicegroups/id/$groupID" -X GET)
+  currentDevices=$(xmllint --xpath "string(//mobile_device_group/mobile_devices/mobile_device/id)" - <<<"$response")
+
+  # Check if the device is already in the group, and skip it if it is
+  if [[ $currentDevices == *"$deviceID"* ]]; then
+    echo "Mobile device with serial number $serialNumber is already in $mobileGroup."
+    continue
+  fi
+
+  # Create an updated XML with the current devices and the new device
+  updatedDevices="<mobile_device><id>$deviceID</id></mobile_device>$currentDevices"
+  xmlData="<mobile_device_group><mobile_devices>$updatedDevices</mobile_devices></mobile_device_group>"
+  response=$(curl -sS -k -u "$apiUser:$apiPass" "$jamfURL/JSSResource/mobiledevicegroups/id/$groupID" -H "Content-Type: application/xml" -X PUT --data "$xmlData")
+
+  # Check if the device was assigned successfully
+  responseXML=$(xmllint --xpath "string(/mobile_device_group/id)" - <<<"$response" 2>/dev/null)
+
+  if [[ -n $responseXML ]]; then
+    echo "Mobile device with serial number $serialNumber assigned to $mobileGroup."
+  else
+    echo "Failed to assign mobile device with serial number $serialNumber to $mobileGroup."
+    echo "Response from API:"
+    echo "$response"
+  fi
+done
