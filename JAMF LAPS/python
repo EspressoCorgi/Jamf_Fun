@@ -1,0 +1,83 @@
+import subprocess
+import json
+
+def extract_from_json(json_str, key):
+    json_data = json.loads(json_str)
+    
+    if key in json_data:
+        return json_data[key]
+    
+    for k, v in json_data.items():
+        if isinstance(v, dict):
+            result = extract_from_json(json.dumps(v), key)
+            if result is not None:
+                return result
+
+def choose_jamf_pro_url():
+    server_options = ["https://tamutest.jamfcloud.com", "https://tamu.jamfcloud.com"]
+    chosen_server = subprocess.run(
+        ['osascript', '-'],
+        input=f'''
+            set serverOptions to {json.dumps(server_options)}
+            set chosenServer to choose from list serverOptions with title "Select Jamf Pro Server URL" with prompt "Choose the Jamf Pro server you want to use:" default items {json.dumps(["https://tamutest.jamfcloud.com"])} without empty selection allowed
+
+            if chosenServer is false then
+                return "EXIT"
+            else
+                return item 1 of chosenServer
+            end if
+        ''',
+        text=True,
+        capture_output=True
+    )
+
+    return chosen_server.stdout.strip()
+
+def main():
+    # Set the server URL as a variable
+    jamf_pro_url = choose_jamf_pro_url()
+
+    # Check if the user chose to exit the script
+    if jamf_pro_url == "EXIT":
+        print("No server selected. Script will now exit.")
+        exit(1)
+
+    # Prompt the user for Jamf Pro Username, Password, and Computer Serial Number using AppleScript
+    applescript_code = f'''
+        display dialog "Enter your Jamf Pro Username:" default answer ""
+        set theUsername to text returned of result
+
+        display dialog "Enter your Jamf Pro Password:" default answer "" with hidden answer
+        set thePassword to text returned of result
+
+        display dialog "Enter the Computer Serial Number:" default answer ""
+        set theSerialNumber to text returned of result
+
+        return theUsername & "|" & thePassword & "|" & theSerialNumber
+    '''
+
+    jamf_credentials_and_serial = subprocess.run(
+        ['osascript', '-e', applescript_code],
+        text=True,
+        capture_output=True
+    )
+
+    # Extract Jamf Pro Username, Password, and Computer Serial Number from the user input
+    username, password, computer_serial = jamf_credentials_and_serial.stdout.strip().split("|")
+
+    # Request auth token
+    auth_token_response = subprocess.run(
+        ['curl', '--request', 'POST', '--silent', '--url', f'{jamf_pro_url}/api/v1/auth/token', '--user', f'{username}:{password}'],
+        text=True,
+        capture_output=True
+    )
+
+    # Parse auth token
+    auth_token_data = json.loads(auth_token_response.stdout)
+    token = auth_token_data.get('token', '')
+    token_expiration = auth_token_data.get('expires', '')
+
+    # ... (continue the script as per the Bash version)
+
+if __name__ == "__main__":
+    main()
